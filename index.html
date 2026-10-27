@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prana Rover Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#16151a;
+  --panel:#1f1e25;
+  --panel2:#2a2831;
+  --line:#3c3a46;
+  --accent:#b79cff;
+  --accent2:#8b5cf6;
+  --text:#ecebf0;
+  --muted:#9b99a8;
+  --green:#4ade80;
+  --amber:#fbbf24;
+  --red:#f87171;
+  --radius:18px;
+  --font:"Outfit",system-ui,sans-serif;
+  --num:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);
+  background-image:radial-gradient(circle at 15% -10%,rgba(139,92,246,.16),transparent 42%),radial-gradient(circle at 100% 0,rgba(183,156,255,.07),transparent 35%);
+  background-attachment:fixed}
+button,input{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* ---------- top header ---------- */
+.top{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:6px 20px;background:rgba(22,21,26,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--line);
+}
+.top img{width:30px;height:30px;border-radius:8px;object-fit:cover;background:var(--panel2);border:1px solid var(--line)}
+.logo-link{display:flex;align-items:center}
+.nav{display:flex;gap:2px;flex-wrap:wrap}
+.nav-item{
+  padding:5px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);
+  border:1px solid transparent;transition:.2s;text-decoration:none;display:inline-block;
+}
+.nav-item:hover{color:var(--text);background:var(--panel2)}
+.nav-item.active{color:#fff;background:var(--accent2)}
+.spacer{flex:1}
+.conn{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.pill input{width:120px;background:transparent;border:none;border-bottom:1px solid var(--line);padding:2px;font-family:var(--num);color:var(--text);font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:#5b6770}
+.dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(74,222,128,.18)}
+.dot.off{background:var(--red)}
+.dot.demo{background:var(--amber)}
+.chipbtn{border:1px solid var(--line);background:var(--panel2);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);transition:.2s}
+.chipbtn:hover{border-color:var(--accent);color:var(--accent)}
+.chipbtn.on{background:var(--amber);border-color:var(--amber);color:#2a1c00}
+
+/* ---------- bento grid ---------- */
+.wrap{padding:8px 28px 60px;max-width:1700px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:20px;align-items:start}
+.span8{grid-column:span 8}.span4{grid-column:span 4}.span12{grid-column:span 12}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;scroll-margin-top:56px}
+.card-title{
+  display:flex;align-items:center;gap:10px;margin:0 0 16px;flex:none;
+  font-family:var(--num);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+}
+.card-title::before{content:"";width:18px;height:3px;border-radius:2px;background:var(--accent2)}
+.card-title .title-tools{margin-left:auto;display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:.04em}
+.card-title .hint{font-size:11px;font-weight:500;color:var(--muted)}
+.card-title .mini{padding:5px 10px;font-size:11px;border-radius:8px}
+.tile{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+
+/* ---------- PAGE VIEW (single section per page) ---------- */
+.is-hidden{display:none!important}
+body.single .card{grid-column:1/-1!important}
+body.single .card:not(.cam-section){max-width:960px;width:100%;margin:0 auto}
+body.single .cam-section{height:calc(100vh - 66px)!important;height:calc(100dvh - 66px)!important}
+body.single .sec-grip{display:none}
+body.single .img-frame{max-height:70vh}
+body.single .pano-frame{height:min(60vh,560px)}
+body.single .log{height:60vh}
+
+/* ---------- cameras: resizable section, tiled layout that always fills it ---------- */
+.grid{grid-auto-flow:row dense}
+.cam-section{
+  grid-column:span var(--cam-span,12);
+  position:relative;
+  display:flex;flex-direction:column;
+  height:calc(100vh - 66px);height:calc(100dvh - 66px);
+  height:var(--cam-h,calc(100dvh - 66px));
+  min-height:300px;
+  overflow:hidden;
+}
+.sec-grip{
+  position:absolute;right:4px;bottom:4px;width:22px;height:22px;z-index:6;
+  border-radius:7px;background:var(--accent2);border:1px solid rgba(255,255,255,.25);
+  cursor:nwse-resize;touch-action:none;display:flex;align-items:center;justify-content:center;
+  opacity:.7;transition:opacity .2s,filter .2s;
+}
+.sec-grip:hover,.sec-grip:focus-visible,.cam-section.sec-resizing .sec-grip{opacity:1;filter:brightness(1.2)}
+.sec-grip svg{pointer-events:none}
+.sec-badge{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;
+  background:rgba(0,0,0,.75);color:var(--accent);font-family:var(--num);font-size:13px;font-weight:700;
+  padding:6px 12px;border-radius:8px;display:none;white-space:nowrap;
+}
+.cam-section.sec-resizing .sec-badge{display:block}
+body.sec-dragging,body.sec-dragging *{cursor:nwse-resize!important;user-select:none}
+
+.camera-grid{
+  flex:1;min-height:0;position:relative;
+  overflow:hidden;
+}
+.cam-cell{
+  position:absolute;left:0;top:0;width:200px;height:150px;   /* set from JS */
+  transition:left .18s ease,top .18s ease,width .18s ease,height .18s ease;
+}
+.cam-cell.open{z-index:200!important}
+.cam-cell.moving{transition:none;z-index:30;opacity:.92}
+body.cam-resizing .cam-cell{transition:none}
+.camera-card{
+  width:100%;height:100%;background:var(--panel2);border-radius:14px;border:1px solid var(--line);
+  display:flex;flex-direction:column;overflow:hidden;transition:border-color .2s;position:relative;cursor:zoom-in;
+}
+.camera-card.expanded{
+  position:fixed;inset:7vh 7vw;width:auto;height:auto;z-index:200;cursor:zoom-out;border-color:var(--accent);
+  box-shadow:0 30px 90px rgba(0,0,0,.7);
+}
+.camera-card.expanded .cap{font-size:16px;padding:12px 18px;cursor:default}
+.camera-card.expanded img{object-fit:contain;background:#000}
+.cam-backdrop{position:fixed;inset:0;background:rgba(10,8,15,.8);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);z-index:190;display:none}
+.cam-backdrop.show{display:block}
+.camera-card:hover{border-color:var(--accent)}
+.camera-card .cap{
+  font-family:var(--num);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--accent);
+  padding:8px 12px;flex:none;border-bottom:1px solid var(--line);cursor:grab;touch-action:none;user-select:none;
+}
+.camera-card img{width:100%;flex:1;min-height:0;object-fit:cover}
+
+/* per-camera resize grip */
+.cam-grip{
+  position:absolute;right:6px;bottom:6px;width:26px;height:26px;z-index:5;
+  border-radius:8px;background:rgba(139,92,246,.92);border:1px solid rgba(255,255,255,.25);
+  cursor:nwse-resize;touch-action:none;display:flex;align-items:center;justify-content:center;
+  opacity:.55;transition:opacity .2s,transform .2s,filter .2s;
+}
+.cam-cell:hover .cam-grip,.cam-grip:focus-visible,.cam-cell.resizing .cam-grip{opacity:1}
+.cam-grip:hover{filter:brightness(1.2);transform:scale(1.1)}
+.cam-grip svg{pointer-events:none}
+.cam-badge{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;pointer-events:none;
+  background:rgba(0,0,0,.75);color:var(--accent);font-family:var(--num);font-size:13px;font-weight:700;
+  padding:6px 12px;border-radius:8px;display:none;white-space:nowrap;
+}
+.cam-cell.resizing .camera-card,.cam-cell.moving .camera-card{border-color:var(--accent);box-shadow:0 0 0 2px rgba(183,156,255,.35)}
+.cam-cell.resizing .camera-card{pointer-events:none}
+.cam-cell.resizing .cam-badge{display:block}
+.cam-cell.drop .camera-card{border-color:var(--green);box-shadow:0 0 0 3px rgba(74,222,128,.4)}
+body.cam-dragging{user-select:none}
+body.cam-resizing,body.cam-resizing *{cursor:nwse-resize!important}
+body.cam-moving,body.cam-moving *{cursor:grabbing!important}
+
+/* ---------- state ---------- */
+.state{font-family:var(--num);font-weight:700;font-size:13px;padding:4px 12px;border-radius:8px;letter-spacing:.06em}
+.state.OFF{background:rgba(248,113,113,.15);color:var(--red)}
+.state.ON{background:rgba(74,222,128,.15);color:var(--green)}
+.state.PAUSED{background:rgba(251,191,36,.15);color:var(--amber)}
+
+/* ---------- autonomy & controls ---------- */
+.auto-head{display:flex;align-items:center;gap:12px;font-size:16px;margin-bottom:14px}
+.auto-head svg{flex:none}
+.ctl-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.ctl{
+  display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 10px;border:none;border-radius:12px;
+  cursor:pointer;font-size:14px;font-weight:600;transition:.2s;
+}
+.ctl:hover{filter:brightness(1.12);transform:translateY(-2px)}
+.ctl-wrap{display:flex;align-items:center;gap:10px}
+.kill-btn{
+  width:100%;background:var(--red);border:none;padding:16px 20px;color:#1a0507;font-size:20px;font-weight:800;letter-spacing:.12em;
+  border-radius:12px;cursor:pointer;transition:.2s;box-shadow:0 6px 24px rgba(248,113,113,.28);
+}
+.kill-btn:hover{filter:brightness(1.1)}
+
+/* ---------- status metrics ---------- */
+.metric{display:flex;align-items:center;gap:14px;width:100%}
+.metric+.metric{margin-top:16px}
+.metric svg{flex:none;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:5px;width:40px;height:40px}
+.metric .grow{flex:1}
+.metric .head{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted)}
+.metric .head b{font-family:var(--num);font-weight:700;font-size:16px}
+.track{background:var(--bg);height:8px;border-radius:4px;margin-top:7px;border:1px solid var(--line);overflow:hidden}
+.track i{display:block;width:0%;height:100%;border-radius:4px;transition:width .3s}
+
+/* ---------- wheels ---------- */
+.wheels-box{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line)}
+.wheels-box .sub{font-family:var(--num);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.wheel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.wheel-item{display:flex;flex-direction:column;align-items:center;gap:6px}
+.wheel{width:62px;height:62px;background:var(--bg);border:1px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.wheel svg{width:32px;height:32px}
+.wheel-item .l{color:var(--muted);font-size:11px;text-align:center;line-height:1.2}
+
+/* ---------- image & gps ---------- */
+.img-frame{width:100%;aspect-ratio:4/3;border-radius:14px;border:1px solid var(--line);background:var(--panel2);overflow:hidden}
+.img-frame img{width:100%;height:100%;object-fit:cover;display:block}
+#object-text{margin:12px 2px 16px;font-size:16px;font-weight:600;color:var(--accent)}
+.kv{display:flex;flex-direction:column;gap:0}
+.kv>div{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+.kv span{font-family:var(--num);font-size:14px;font-weight:700}
+
+/* ---------- panorama ---------- */
+.pano-frame{position:relative;width:100%;height:340px;border-radius:14px;border:1px solid var(--line);overflow:hidden;background:var(--panel2)}
+.pano-frame img{width:100%;height:100%;object-fit:cover;display:block}
+.pano-tag{position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:8px;color:var(--accent);font-weight:600;font-size:13px}
+.pano-details{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.pano-details .tile{font-size:12px;color:var(--muted)}
+.pano-details .tile span{display:block;margin-top:6px;font-family:var(--num);font-size:15px;font-weight:700}
+.pano-title{font-family:var(--num);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:18px}
+
+/* ---------- ABEx table ---------- */
+.abex-table{width:100%;border-collapse:collapse;font-size:16px;background:var(--panel2);border-radius:14px;overflow:hidden}
+.abex-table thead tr{text-align:left;background:rgba(139,92,246,.14);border-bottom:1px solid var(--accent2)}
+.abex-table th{padding:13px 16px;font-family:var(--num);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.abex-table td{padding:13px 16px;color:var(--accent2);font-family:var(--num);font-weight:700}
+.abex-table td.p{display:flex;align-items:center;gap:12px;color:var(--text);font-family:var(--font);font-weight:500}
+.abex-table tbody tr{border-bottom:1px solid var(--line)}
+.abex-table tbody tr:last-child{border-bottom:none}
+
+/* ---------- log ---------- */
+.log{height:262px;overflow-y:auto;font-family:var(--num);font-size:12.5px;line-height:1.8;color:var(--muted);text-align:left;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.log span{color:var(--accent);margin-right:12px}
+.log .bad{color:var(--red)}.log .good{color:var(--green)}
+
+dialog{border:1px solid var(--red);border-radius:var(--radius);padding:28px 30px;max-width:420px;background:var(--panel);color:var(--text)}
+dialog::backdrop{background:rgba(8,7,12,.75)}
+dialog h3{margin:0 0 8px;font-family:var(--num);font-size:22px}
+dialog p{margin:0 0 22px;color:var(--muted);line-height:1.5;font-size:16px}
+dialog .btns{display:flex;gap:10px;justify-content:flex-end}
+dialog .kill-btn{width:auto;font-size:15px;letter-spacing:.04em}
+
+@media (max-width:1200px){
+  .span8,.span4{grid-column:span 12}
+  .cam-section{grid-column:span 12}
+}
+@media (max-width:760px){
+  .camera-card.expanded{inset:4vh 3vw}
+  .pano-details{grid-template-columns:repeat(2,1fr)}
+  .wrap{padding:8px 14px 50px}
+  .top{padding:6px 12px}
+  .card-title .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+
+<body>
+
+<!-- ===== top bar: logo, navigation, connection ===== -->
+<header class="top">
+
+  <nav class="nav">
+    <a class="nav-item" id="nav-home"     href="#/">Dashboard</a>
+    <a class="nav-item" id="nav-cameras"  href="#/cameras">Camera Feeds</a>
+    <a class="nav-item" id="nav-autonomy" href="#/autonomy">Autonomy &amp; Controls</a>
+    <a class="nav-item" id="nav-status"   href="#/status">Rover Status</a>
+    <a class="nav-item" id="nav-object"   href="#/object">Image &amp; GPS</a>
+    <a class="nav-item" id="nav-panorama" href="#/panorama">Panorama</a>
+    <a class="nav-item" id="nav-abex"     href="#/abex">ABEx Sensor Data</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="conn">
+    <label class="pill">Rover address <input id="ip" spellcheck="false"></label>
+    <button class="chipbtn" id="apply">Connect</button>
+    <button class="chipbtn" id="demoBtn" title="Simulate telemetry to preview the layout">Demo mode</button>
+    <div class="pill"><span class="dot off" id="dot"></span><span id="connText">Disconnected</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="grid">
+
+  <!-- ===== Camera Feeds (resizable section) ===== -->
+  <section class="card span12 cam-section" id="cameras">
+    <h2 class="card-title">
+      Camera Feeds
+      <span class="title-tools">
+        <button class="chipbtn mini" id="camReset" title="Restore the default camera layout">Reset layout</button>
+      </span>
+    </h2>
+    <div class="camera-grid" id="cams"></div>
+    <div class="sec-badge" id="secBadge"></div>
+    <div class="sec-grip" id="secGrip" tabindex="0" role="separator" aria-label="Resize camera section"
+         title="Drag to resize the camera section · double-click = reset">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M12 5L5 12M12 9L9 12"/></svg>
+    </div>
+  </section>
+
+  <!-- ===== Autonomy & Controls ===== -->
+  <section class="card span4" id="autonomy">
+    <h2 class="card-title">Autonomy &amp; Controls</h2>
+    <div class="auto-head">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="var(--accent)" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.39 2.82 8.1 6.71 9.5l-.71-2.21 2.21-.71C9.9 16.18 12 14.25 12 12c0-2.21-1.79-4-4-4s-4 1.79-4 4h2l-1 3H2c0-4.42 3.58-8 8-8s8 3.58 8 8c0 1.7-.66 3.24-1.74 4.42l-1.58-1.58C16.76 15.36 18 13.28 18 11c0-3.87-3.13-7-7-7z"/></svg>
+      <div>Autonomy Status: <span class="state OFF" id="autonomy-status">OFF</span></div>
+    </div>
+    <div class="ctl-row">
+      <button class="ctl" id="clearBtn" style="background:var(--accent2); color:#fff;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#fff" viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z"/></svg>Clear Cost Map</button>
+      <button class="ctl" id="relocBtn" style="background:var(--amber); color:#2a1c00;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#2a1c00" viewBox="0 0 24 24"><path d="M12 8V4l8 8-8 8v-4H4V8z"/></svg>Relocalize</button>
+    </div>
+    <button class="kill-btn" id="killBtn">KILL SWITCH</button>
+  </section>
+
+  <!-- ===== Rover Status & Wheel Telemetry ===== -->
+  <section class="card span8" id="status">
+    <h2 class="card-title">Rover Status &amp; Wheel Telemetry</h2>
+    <div class="metric">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="var(--accent)" viewBox="0 0 24 24"><path d="M16 4h-1V2h-6v2H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>
+      <div class="grow">
+        <div class="head"><span>Battery Voltage</span><b id="battery-voltage" style="color:var(--accent)">--</b></div>
+        <div class="track"><i id="battery-bar" style="background:var(--accent)"></i></div>
+      </div>
+    </div>
+    <div class="metric">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="var(--accent2)" viewBox="0 0 24 24"><path d="M12 4c-4.41 0-8 3.59-8 8h2a6 6 0 1 1 12 0h2c0-4.41-3.59-8-8-8zm0 8c-1.1 0-2-.9-2-2h4c0 1.1-.9 2-2 2z"/></svg>
+      <div class="grow">
+        <div class="head"><span>Speed</span><b id="speed-value" style="color:var(--accent2)">--</b></div>
+        <div class="track"><i id="speed-bar" style="background:var(--accent2)"></i></div>
+      </div>
+    </div>
+    <div class="metric">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="var(--amber)" viewBox="0 0 24 24"><path d="M7 2v13h3v7l7-12h-4l-6-8z"/></svg>
+      <div class="grow">
+        <div class="head"><span>Power</span><b id="power-value" style="color:var(--amber)">--</b></div>
+        <div class="track"><i id="power-bar" style="background:var(--amber)"></i></div>
+      </div>
+    </div>
+
+    <div class="wheels-box">
+      <div class="sub">Wheel Telemetry</div>
+      <div class="wheel-grid" id="wheelGrid"></div>
+    </div>
+  </section>
+
+  <!-- ===== Image & GPS ===== -->
+  <section class="card span4" id="object">
+    <h2 class="card-title">Image &amp; GPS</h2>
+    <div class="img-frame">
+      <img id="objImg" alt="Detected object">
+    </div>
+    <div id="object-text">--</div>
+    <div class="kv">
+      <div style="color:var(--accent); font-weight:600;">GPS Coordinates</div>
+      <div>Latitude: <span id="gps-lat" style="color:var(--accent2);">--</span></div>
+      <div>Longitude: <span id="gps-lon" style="color:var(--accent2);">--</span></div>
+      <div>Altitude: <span id="gps-alt" style="color:var(--amber);">--</span></div>
+    </div>
+  </section>
+
+  <!-- ===== Panorama ===== -->
+  <section class="card span8" id="panorama">
+    <h2 class="card-title">Panorama</h2>
+    <div class="pano-frame">
+      <img id="panoImg" alt="Panorama" style="display:none">
+      <div class="pano-tag">Panorama View</div>
+    </div>
+    <div class="pano-title">Details</div>
+    <div class="pano-details">
+      <div class="tile">Cardinal Directions: <span id="pano-dir" style="color:var(--accent2);">--</span></div>
+      <div class="tile">GPS Coordinates: <span id="pano-gps" style="color:var(--accent2);">--</span></div>
+      <div class="tile">Elevation: <span id="pano-ele" style="color:var(--amber);">--</span></div>
+      <div class="tile">Accuracy Range: <span id="pano-acc" style="color:var(--accent2);">--</span></div>
+    </div>
+  </section>
+
+  <!-- ===== ABEx Sensor Data ===== -->
+  <section class="card span8" id="abex">
+    <h2 class="card-title">ABEx Sensor Data</h2>
+    <table class="abex-table">
+      <thead>
+        <tr><th>Parameter</th><th>Soil</th><th>Atmosphere</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="p"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32" fill="var(--accent)"><path d="M26 17v-2h-4.05A8 8 0 0 0 14 5.05V4h-2v1.05A8 8 0 0 0 4.05 15H2v2h2.05A8 8 0 0 0 12 26.95V28h2v-1.05A8 8 0 0 0 21.95 17zm-12 8a6 6 0 1 1 6-6a6 6 0 0 1-6 6z"/></svg>Temperature</td>
+          <td id="soil-temp">--</td><td id="atm-temp">--</td>
+        </tr>
+        <tr>
+          <td class="p"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32" fill="var(--accent)"><path d="M16 4.586L7.293 13.293A8 8 0 1 0 24.707 13.293zM16 26a6 6 0 0 1-6-6a5.84 5.84 0 0 1 1.757-4.243L16 11.514l4.243 4.243A5.84 5.84 0 0 1 22 20a6 6 0 0 1-6 6z"/></svg>Humidity</td>
+          <td id="soil-hum">--</td><td id="atm-hum">--</td>
+        </tr>
+        <tr>
+          <td class="p"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32" fill="var(--accent)"><path d="M21 2H11L4 14l12 16l12-16zm-6 24L7.515 14L13 4h6l5.485 10z"/></svg>pH</td>
+          <td id="soil-ph">--</td><td id="atm-ph">--</td>
+        </tr>
+        <tr>
+          <td class="p"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32" fill="var(--accent)"><path d="M16 2a14 14 0 1 0 14 14A14.016 14.016 0 0 0 16 2zm0 26a12 12 0 1 1 12-12a12.013 12.013 0 0 1-12 12zm1-12V8h-2v10h8v-2z"/></svg>Pressure</td>
+          <td id="soil-pres">--</td><td id="atm-pres">--</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== Event log ===== -->
+  <section class="card span4" id="logSection">
+    <h2 class="card-title">Event Log</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+</div>
+</main>
+
+<div class="cam-backdrop" id="camBackdrop"></div>
+
+<dialog id="killDlg">
+  <h3>Send emergency stop?</h3>
+  <p>This publishes the kill switch to the rover and stops all motion.</p>
+  <div class="btns">
+    <button class="chipbtn" id="killNo">Cancel</button>
+    <button class="kill-btn" id="killYes">Stop rover</button>
+  </div>
+</dialog>
+
+<script>
+/* ---------------- CONFIG ---------------- */
+const CAMERAS=[
+  ["webcam1","USB Webcam 1"],["webcam2","USB Webcam 2"],
+  ["ipcam1","IPcam1"],["ipcam2","IPcam2"],["ipcam3","IPcam3"],["ipcam4","IPcam4"]
+];
+const WHEELS=[["fl","Front Left"],["fr","Front Right"],["rl","Rear Left"],["rr","Rear Right"]];
+const order=["fl","fr","rl","rr"];
+
+let host=(location.protocol.startsWith("http")&&location.host)?location.host:"localhost:8000";
+try{ host=localStorage.getItem("roverHost")||host; }catch(e){}
+let ws=null, reconnectTimer=null, demoTimer=null, demo=false;
+let objStamp=null, panoStamp=null;
+const $=id=>document.getElementById(id);
+const set=(id,t)=>{ $(id).textContent=t; };
+const num=(v,d=1)=>(typeof v==="number"&&isFinite(v))?v.toFixed(d):"--";
+const api=()=>`http://${host}`;
+
+/* ---------------- LOG ---------------- */
+function log(msg,cls=""){
+  const el=$("log"), d=document.createElement("div");
+  if(cls) d.className=cls;
+  const s=document.createElement("span");
+  s.textContent=new Date().toLocaleTimeString([],{hour12:false});
+  d.append(s,msg); el.appendChild(d); el.scrollTop=el.scrollHeight;
+  while(el.children.length>200) el.removeChild(el.firstChild);
+}
+
+/* ---------------- CAMERAS ----------------
+   Tiled layout that ALWAYS fills the camera area:
+     tiles = { rows:[ { h:<row height fraction>, items:[ {id, w:<width fraction>} ] } ] }
+   Row heights add up to 1, and item widths in a row add up to 1.
+   Resizing a camera moves the boundary between it and its neighbour, so the
+   neighbouring cameras shrink/grow automatically. Nothing overlaps or scrolls. */
+const camsEl=$("cams"), camImgs={}, camCells={}, camRect={};
+const camBackdrop=$("camBackdrop"); let openCam=null;
+function closeCam(){
+  if(openCam){
+    openCam.classList.remove("expanded");
+    openCam.parentElement.classList.remove("open");
+    openCam=null;
+  }
+  camBackdrop.classList.remove("show");
+}
+camBackdrop.onclick=closeCam;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeCam(); });
+
+const CAM_GAP=12, CAM_MIN={w:140,h:100};
+const camIds=CAMERAS.map(c=>c[0]);
+const areaW=()=>camsEl.clientWidth||600;
+const areaH=()=>camsEl.clientHeight||400;
+
+function defaultTiles(){
+  const cols=areaW()<520?2:3, rows=[];
+  for(let i=0;i<camIds.length;i+=cols){
+    const ids=camIds.slice(i,i+cols);
+    rows.push({h:0,items:ids.map(id=>({id,w:1/ids.length}))});
+  }
+  rows.forEach(r=>r.h=1/rows.length);
+  return {rows};
+}
+function validTiles(t){
+  try{
+    const ids=[];
+    for(const r of t.rows){
+      if(!isFinite(r.h)||r.h<=0) return false;
+      for(const it of r.items){ if(!isFinite(it.w)||it.w<=0) return false; ids.push(it.id); }
+    }
+    return ids.length===camIds.length && camIds.every(id=>ids.includes(id));
+  }catch(e){ return false; }
+}
+let tiles=null;
+try{ const s=JSON.parse(localStorage.getItem("camTiles1")||"null"); if(s&&validTiles(s)) tiles=s; }catch(e){}
+if(!tiles) tiles=defaultTiles();
+const saveTiles=()=>{ try{ localStorage.setItem("camTiles1",JSON.stringify(tiles)); }catch(_){} };
+
+let movingId=null;
+function paint(id,r){
+  const c=camCells[id];
+  c.style.left=r.x+"px"; c.style.top=r.y+"px";
+  c.style.width=r.w+"px"; c.style.height=r.h+"px";
+}
+function paintAll(){
+  const W=areaW(), H=areaH(), nR=tiles.rows.length;
+  const availH=H-CAM_GAP*(nR-1);
+  let y=0;
+  tiles.rows.forEach(row=>{
+    const rh=row.h*availH, n=row.items.length, availW=W-CAM_GAP*(n-1);
+    let x=0;
+    row.items.forEach(it=>{
+      const w=it.w*availW;
+      camRect[it.id]={x,y,w,h:rh};
+      if(it.id!==movingId) paint(it.id,camRect[it.id]);
+      x+=w+CAM_GAP;
+    });
+    y+=rh+CAM_GAP;
+  });
+}
+function locate(id){
+  for(let ri=0;ri<tiles.rows.length;ri++){
+    const ci=tiles.rows[ri].items.findIndex(it=>it.id===id);
+    if(ci>-1) return {ri,ci};
+  }
+  return null;
+}
+/* snapshot of the fractions a resize starts from */
+function snap(id){
+  const {ri,ci}=locate(id), row=tiles.rows[ri], n=row.items.length, nR=tiles.rows.length;
+  const dci=n>1?(ci+1<n?ci+1:ci-1):-1;     // neighbour that gives/takes width
+  const dri=nR>1?(ri+1<nR?ri+1:ri-1):-1;   // neighbouring row that gives/takes height
+  return {
+    ri,ci,dci,dri,
+    w:row.items[ci].w, dw:dci>-1?row.items[dci].w:0,
+    h:row.h,           dh:dri>-1?tiles.rows[dri].h:0
+  };
+}
+function resizeBy(s,dx,dy){
+  const W=areaW(), H=areaH();
+  const row=tiles.rows[s.ri];
+  if(s.dci>-1){
+    const n=row.items.length, availW=W-CAM_GAP*(n-1);
+    const minF=Math.min(CAM_MIN.w/availW,0.9/n);
+    const df=Math.max(minF-s.w,Math.min(s.dw-minF,dx/availW));
+    row.items[s.ci].w=s.w+df; row.items[s.dci].w=s.dw-df;
+  }
+  if(s.dri>-1){
+    const nR=tiles.rows.length, availH=H-CAM_GAP*(nR-1);
+    const minF=Math.min(CAM_MIN.h/availH,0.9/nR);
+    const df=Math.max(minF-s.h,Math.min(s.dh-minF,dy/availH));
+    tiles.rows[s.ri].h=s.h+df; tiles.rows[s.dri].h=s.dh-df;
+  }
+  paintAll();
+}
+function swapCams(a,b){
+  const A=locate(a), B=locate(b);
+  const ia=tiles.rows[A.ri].items[A.ci], ib=tiles.rows[B.ri].items[B.ci];
+  const t=ia.id; ia.id=ib.id; ib.id=t;      // slots keep their sizes, cameras trade places
+}
+
+CAMERAS.forEach(([id,name])=>{
+  const d=document.createElement("div");
+  d.className="camera-card";
+  d.innerHTML=`<div class="cap">${name}</div><img alt="${name}">`;
+  const img=d.querySelector("img"), cap=d.querySelector(".cap");
+  img.onerror=()=>{ img.style.visibility="hidden"; };
+  img.onload =()=>{ img.style.visibility="visible"; };
+
+  const cell=document.createElement("div");
+  cell.className="cam-cell"; cell.appendChild(d);
+  const badge=document.createElement("div"); badge.className="cam-badge"; cell.appendChild(badge);
+
+  let suppressClick=false;
+  d.tabIndex=0;
+  d.onclick=()=>{
+    if(suppressClick){ suppressClick=false; return; }
+    if(openCam===d){ closeCam(); return; }
+    closeCam();
+    d.classList.add("expanded"); cell.classList.add("open"); openCam=d; camBackdrop.classList.add("show");
+  };
+  d.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); d.click(); } });
+
+  const grip=document.createElement("div");
+  grip.className="cam-grip"; grip.tabIndex=0; grip.setAttribute("role","separator");
+  grip.setAttribute("aria-label","Resize "+name);
+  grip.title="Drag to resize "+name+" (other cameras adjust) · double-click = reset layout";
+  grip.innerHTML=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M12 5L5 12M12 9L9 12"/></svg>`;
+  cell.appendChild(grip);
+
+  camsEl.appendChild(cell); camImgs[id]=img; camCells[id]=cell;
+
+  /* ----- resize: drag the corner grip, neighbours adjust ----- */
+  let rs=null;
+  grip.addEventListener("pointerdown",e=>{
+    e.preventDefault(); e.stopPropagation();
+    closeCam();
+    grip.setPointerCapture(e.pointerId);
+    rs={px:e.clientX,py:e.clientY,s:snap(id)};
+    cell.classList.add("resizing"); document.body.classList.add("cam-dragging","cam-resizing");
+    const r=camRect[id]; badge.textContent=`${Math.round(r.w)} × ${Math.round(r.h)}`;
+  });
+  grip.addEventListener("pointermove",e=>{
+    if(!rs) return;
+    resizeBy(rs.s,e.clientX-rs.px,e.clientY-rs.py);
+    const r=camRect[id]; badge.textContent=`${Math.round(r.w)} × ${Math.round(r.h)}`;
+  });
+  const endRs=e=>{
+    if(!rs) return;
+    rs=null; cell.classList.remove("resizing"); document.body.classList.remove("cam-dragging","cam-resizing");
+    try{ grip.releasePointerCapture(e.pointerId); }catch(_){}
+    saveTiles();
+  };
+  grip.addEventListener("pointerup",endRs);
+  grip.addEventListener("pointercancel",endRs);
+
+  // double-click grip: restore the default layout
+  grip.addEventListener("dblclick",resetCams);
+
+  // keyboard: arrow keys resize (Shift = bigger steps)
+  grip.addEventListener("keydown",e=>{
+    const step=e.shiftKey?60:20; let dx=0,dy=0;
+    if(e.key==="ArrowRight") dx=step; else if(e.key==="ArrowLeft") dx=-step;
+    else if(e.key==="ArrowDown") dy=step; else if(e.key==="ArrowUp") dy=-step; else return;
+    e.preventDefault();
+    resizeBy(snap(id),dx,dy); saveTiles();
+  });
+
+  /* ----- swap: drag the title bar onto another camera ----- */
+  let mv=null, target=null;
+  const clearDrop=()=>{ if(target){ camCells[target].classList.remove("drop"); target=null; } };
+  cap.addEventListener("pointerdown",e=>{
+    if(d.classList.contains("expanded")) return;
+    cap.setPointerCapture(e.pointerId);
+    mv={px:e.clientX,py:e.clientY,r:{...camRect[id]},moved:false};
+  });
+  cap.addEventListener("pointermove",e=>{
+    if(!mv) return;
+    const dx=e.clientX-mv.px, dy=e.clientY-mv.py;
+    if(!mv.moved && Math.hypot(dx,dy)<5) return;
+    if(!mv.moved){ mv.moved=true; movingId=id; cell.classList.add("moving"); document.body.classList.add("cam-dragging","cam-moving"); }
+    const W=areaW(), H=areaH();
+    paint(id,{
+      x:Math.min(W-mv.r.w,Math.max(0,mv.r.x+dx)),
+      y:Math.min(H-mv.r.h,Math.max(0,mv.r.y+dy)),
+      w:mv.r.w,h:mv.r.h
+    });
+    // which camera is the pointer over?
+    const box=camsEl.getBoundingClientRect(), px=e.clientX-box.left, py=e.clientY-box.top;
+    let hit=null;
+    for(const o of camIds){
+      if(o===id) continue;
+      const r=camRect[o];
+      if(px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h){ hit=o; break; }
+    }
+    if(hit!==target){ clearDrop(); target=hit; if(hit) camCells[hit].classList.add("drop"); }
+  });
+  const endMv=e=>{
+    if(!mv) return;
+    const moved=mv.moved; mv=null;
+    try{ cap.releasePointerCapture(e.pointerId); }catch(_){}
+    if(moved){
+      if(target) swapCams(id,target);
+      clearDrop();
+      movingId=null; cell.classList.remove("moving");
+      document.body.classList.remove("cam-dragging","cam-moving");
+      suppressClick=true; setTimeout(()=>{suppressClick=false;},0);
+      paintAll(); saveTiles();
+    }
+  };
+  cap.addEventListener("pointerup",endMv);
+  cap.addEventListener("pointercancel",endMv);
+});
+
+function loadCameras(){
+  CAMERAS.forEach(([id])=>{ camImgs[id].src=`${api()}/camera/${id}?t=${Date.now()}`; });
+}
+
+function resetCams(){
+  tiles=defaultTiles();
+  try{ localStorage.removeItem("camTiles1"); }catch(_){}
+  sec={h:null,span:12}; applySec(); saveSec();
+  paintAll();
+}
+$("camReset").onclick=resetCams;
+
+/* ---------------- CAMERA SECTION RESIZE ---------------- */
+const camSec=$("cameras"), gridEl=document.querySelector(".grid"), secGrip=$("secGrip"), secBadge=$("secBadge");
+const SEC_MIN_H=300, GRID_GAP=20;
+let sec={h:null,span:12};
+try{
+  const s=JSON.parse(localStorage.getItem("camSec1")||"null");
+  if(s) sec={h:s.h>0?s.h:null, span:(s.span>=4&&s.span<=12)?s.span:12};
+}catch(e){}
+function saveSec(){ try{ localStorage.setItem("camSec1",JSON.stringify(sec)); }catch(_){} }
+function applySec(){
+  if(sec.h) camSec.style.setProperty("--cam-h",sec.h+"px"); else camSec.style.removeProperty("--cam-h");
+  camSec.style.setProperty("--cam-span",sec.span);
+}
+const wideLayout=()=>window.innerWidth>1200;
+const colW=()=>(gridEl.clientWidth-GRID_GAP*11)/12;
+const spanToPx=n=>n*colW()+(n-1)*GRID_GAP;
+function secBadgeTxt(){ secBadge.textContent=`${Math.round(camSec.offsetWidth)} × ${Math.round(camSec.offsetHeight)}`; }
+
+let sr=null;
+secGrip.addEventListener("pointerdown",e=>{
+  e.preventDefault(); closeCam();
+  secGrip.setPointerCapture(e.pointerId);
+  sr={px:e.clientX,py:e.clientY,w:camSec.offsetWidth,h:camSec.offsetHeight};
+  camSec.classList.add("sec-resizing"); document.body.classList.add("sec-dragging");
+  secBadgeTxt();
+});
+secGrip.addEventListener("pointermove",e=>{
+  if(!sr) return;
+  sec.h=Math.round(Math.max(SEC_MIN_H,Math.min(window.innerHeight*3,sr.h+e.clientY-sr.py)));
+  if(wideLayout()){
+    const want=(sr.w+e.clientX-sr.px+GRID_GAP)/(colW()+GRID_GAP);
+    sec.span=Math.max(4,Math.min(12,Math.round(want)));
+  }
+  applySec(); secBadgeTxt();
+});
+const endSec=e=>{
+  if(!sr) return;
+  sr=null; camSec.classList.remove("sec-resizing"); document.body.classList.remove("sec-dragging");
+  try{ secGrip.releasePointerCapture(e.pointerId); }catch(_){}
+  saveSec();
+};
+secGrip.addEventListener("pointerup",endSec);
+secGrip.addEventListener("pointercancel",endSec);
+secGrip.addEventListener("dblclick",resetCams);
+secGrip.addEventListener("keydown",e=>{
+  const step=e.shiftKey?80:30;
+  const baseH=sec.h||camSec.offsetHeight;
+  if(e.key==="ArrowDown") sec.h=baseH+step;
+  else if(e.key==="ArrowUp") sec.h=Math.max(SEC_MIN_H,baseH-step);
+  else if(e.key==="ArrowRight"&&wideLayout()) sec.span=Math.min(12,sec.span+1);
+  else if(e.key==="ArrowLeft"&&wideLayout()) sec.span=Math.max(4,sec.span-1);
+  else return;
+  e.preventDefault(); applySec(); saveSec();
+});
+applySec();
+
+// the area is fixed; if the window changes, the tiles re-fit inside it
+new ResizeObserver(paintAll).observe(camsEl);
+paintAll();
+requestAnimationFrame(paintAll);
+
+/* ---------------- WHEELS ---------------- */
+const wheelSVG=`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="var(--accent)" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="2" fill="none"/>
+  <line x1="12" y1="2" x2="12" y2="22" stroke="var(--accent)" stroke-width="2"/>
+  <line x1="2" y1="12" x2="22" y2="12" stroke="var(--accent)" stroke-width="2"/></svg>`;
+const wheelGrid=$("wheelGrid"), wheelIcon={};
+WHEELS.forEach(([k,label])=>{
+  const w=document.createElement("div");
+  w.className="wheel-item";
+  w.innerHTML=`<div class="wheel" id="wheel-${k}">${wheelSVG}</div><div class="l">${label}</div>`;
+  wheelGrid.appendChild(w);
+  wheelIcon[k]=w.querySelector("svg");
+});
+const wVel={fl:0,fr:0,rl:0,rr:0}, wAng={fl:0,fr:0,rl:0,rr:0};
+let last=performance.now();
+(function anim(now){
+  const dt=(now-last)/1000; last=now;
+  order.forEach(k=>{
+    wAng[k]=(wAng[k]+wVel[k]*57.3*dt)%360;
+    wheelIcon[k].style.transform=`rotate(${wAng[k]}deg)`;
+  });
+  requestAnimationFrame(anim);
+})(last);
+
+/* ---------------- RENDER ---------------- */
+function render(d){
+  if(d.autonomy){
+    const el=$("autonomy-status");
+    if(el.textContent!==d.autonomy) log("Autonomy: "+d.autonomy);
+    el.textContent=d.autonomy; el.className="state "+d.autonomy;
+  }
+  if(d.battery){
+    $("battery-voltage").textContent=`${d.battery.voltage} V`;
+    $("battery-bar").style.width=`${Math.max(0,Math.min(100,d.battery.percent))}%`;
+  }
+  if(d.speed!==undefined){
+    $("speed-value").textContent=`${d.speed} m/s`;
+    $("speed-bar").style.width=`${Math.min(Math.abs(d.speed)/5*100,100)}%`;     // scale 0-5 m/s
+  }
+  if(d.power!==undefined){
+    $("power-value").textContent=`${d.power} W`;
+    $("power-bar").style.width=`${Math.min(d.power/100*100,100)}%`;            // scale max 100 W
+  }
+  if(d.gps){
+    set("gps-lat",num(d.gps.lat,6)); set("gps-lon",num(d.gps.lon,6));
+    set("gps-alt",typeof d.gps.alt==="number"?`${d.gps.alt.toFixed(1)} m`:"--");
+  }
+  if(d.wheels){
+    order.forEach(k=>{ if(typeof d.wheels[k]==="number") wVel[k]=d.wheels[k]; });
+  }
+  if(d.abex){
+    const a=d.abex, f=(v,u)=>(v===undefined||v===null)?"--":v+u;
+    set("soil-temp",f(a.soil_temp," °C")); set("atm-temp",f(a.atm_temp," °C"));
+    set("soil-hum",f(a.soil_hum," %"));    set("atm-hum",f(a.atm_hum," %"));
+    set("soil-ph",f(a.soil_ph,""));        set("atm-ph",f(a.atm_ph,""));
+    set("soil-pres",f(a.soil_pres," Pa")); set("atm-pres",f(a.atm_pres," Pa"));
+  }
+  if(d.object){
+    if(d.object.stamp!==objStamp){   // reload the picture only when a new one arrives
+      objStamp=d.object.stamp;
+      $("objImg").src=`${api()}/object/image?ts=${objStamp}`;
+    }
+    set("object-text",d.object.name||"--");
+  }
+  if(d.panorama){
+    const p=d.panorama;
+    if(p.stamp!==panoStamp){
+      panoStamp=p.stamp;
+      $("panoImg").src=`${api()}/panorama/image?ts=${panoStamp}`;
+    }
+    set("pano-dir",p.direction||"--");
+    set("pano-gps",(typeof p.lat==="number"&&typeof p.lon==="number")?`${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`:"--");
+    set("pano-ele",typeof p.alt==="number"?`${p.alt.toFixed(1)} m`:"--");
+    set("pano-acc",p.accuracy||"--");
+  }
+}
+
+/* ---------------- CONNECTION ---------------- */
+function setConn(s,t){ $("dot").className="dot "+s; set("connText",t); }
+function connect(){
+  clearTimeout(reconnectTimer);
+  if(ws){ ws.onclose=null; ws.close(); }
+  if(demo) return;
+  setConn("off","Connecting…");
+  try{ ws=new WebSocket(`ws://${host}/ws`); }catch(e){ setConn("off","Invalid address"); return; }
+  ws.onopen=()=>{ setConn("on","Connected"); log("Connected to rover backend","good"); };
+  ws.onmessage=e=>{ try{ render(JSON.parse(e.data)); }catch(err){ log("Bad telemetry packet","bad"); } };
+  ws.onerror=()=>{};
+  ws.onclose=()=>{ setConn("off","Disconnected, retrying"); log("Connection lost, retrying in 2 s","bad");
+    reconnectTimer=setTimeout(connect,2000); };
+}
+$("objImg").onerror=()=>{ $("objImg").style.visibility="hidden"; };
+$("objImg").onload =()=>{ $("objImg").style.visibility="visible"; };
+$("panoImg").onerror=()=>{ $("panoImg").style.visibility="hidden"; };
+$("panoImg").onload =()=>{ $("panoImg").style.visibility="visible"; };
+
+$("apply").onclick=()=>{
+  host=$("ip").value.trim()||host;
+  try{ localStorage.setItem("roverHost",host); }catch(e){}
+  log("Rover address set to "+host);
+  objStamp=panoStamp=null;
+  loadCameras(); connect();
+};
+$("ip").addEventListener("keydown",e=>{ if(e.key==="Enter") $("apply").click(); });
+
+/* ---------------- COMMANDS ---------------- */
+async function send(path,label){
+  if(demo){ log(label+" (demo, not sent)"); return; }
+  try{
+    const r=await fetch(api()+path,{method:"POST"});
+    if(!r.ok) throw new Error(r.status);
+    log(label+" sent","good");
+  }catch(e){ log(label+" failed, rover unreachable","bad"); }
+}
+$("clearBtn").onclick=()=>send("/clear_costmap","Clear cost map");
+$("relocBtn").onclick=()=>send("/relocalize","Relocalize");
+const dlg=$("killDlg");
+$("killBtn").onclick=()=>dlg.showModal();
+$("killNo").onclick=()=>dlg.close();
+$("killYes").onclick=()=>{ dlg.close(); send("/kill","Emergency stop"); };
+
+/* ---------------- DEMO ---------------- */
+$("demoBtn").onclick=()=>{
+  demo=!demo;
+  $("demoBtn").classList.toggle("on",demo);
+  if(demo){
+    if(ws){ ws.onclose=null; ws.close(); }
+    clearTimeout(reconnectTimer);
+    setConn("demo","Demo data"); log("Demo mode on, values are simulated");
+    let t=0;
+    demoTimer=setInterval(()=>{
+      t+=.1; const sp=1.5+Math.sin(t/3);
+      render({
+        autonomy:Math.sin(t/20)>.3?"ON":Math.sin(t/20)<-.6?"PAUSED":"OFF",
+        battery:{voltage:+(24.8-t*.005).toFixed(2),percent:Math.max(5,Math.round(78-t*.1))},
+        speed:+sp.toFixed(2),power:+(30+sp*12).toFixed(1),
+        gps:{lat:13.08268+t*1e-6,lon:80.270721,alt:6.4},
+        wheels:{fl:sp*2,fr:sp*2.1,rl:sp*1.9,rr:sp*2},
+        abex:{soil_temp:+(27+Math.sin(t)).toFixed(1),atm_temp:+(31+Math.cos(t)).toFixed(1),
+          soil_hum:41,atm_hum:58,soil_ph:6.8,atm_ph:7.0,soil_pres:101300,atm_pres:101100},
+        panorama:{direction:"North-East",lat:13.08268,lon:80.270721,alt:6.4,accuracy:"± 1.5 m",stamp:null}
+      });
+      set("object-text","Sample rock (demo)");
+    },100);
+  } else { clearInterval(demoTimer); log("Demo mode off"); connect(); }
+};
+
+/* ---------------- PAGE ROUTING ----------------
+   #/            -> main dashboard (everything, unchanged)
+   #/cameras ... -> a separate page showing only that section              */
+const PAGES=["cameras","autonomy","status","object","panorama","abex"];
+function route(){
+  const key=(location.hash||"").replace(/^#\/?/,"");
+  const page=PAGES.includes(key)?key:"home";
+  closeCam();
+  document.body.classList.toggle("single",page!=="home");
+  document.querySelectorAll(".grid>.card").forEach(c=>{
+    c.classList.toggle("is-hidden",page!=="home" && c.id!==page);
+  });
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  $("nav-"+page).classList.add("active");
+  window.scrollTo(0,0);
+  paintAll();
+  requestAnimationFrame(paintAll);   // re-fit camera tiles after layout changes
+}
+window.addEventListener("hashchange",route);
+
+/* ---------------- START ---------------- */
+$("ip").value=host;
+route();
+loadCameras(); connect(); log("Console ready");
+</script>
+</body>
+</html>
