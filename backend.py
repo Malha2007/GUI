@@ -53,12 +53,19 @@ class RoverNode(Node):
         super().__init__("rover_backend")
         self.bridge = CvBridge()
         self.state = {
-            "battery": {"voltage": None, "percent": None},
+            "battery": {"voltage": None, "percent": None, "current": None},
             "speed": None,
+            "power": None,
             "autonomy": None,
             "gps": {"lat": None, "lon": None, "alt": None},
             "wheels": {"fl": None, "fr": None, "rl": None, "rr": None},
-            "abex": {"soil_temp": None, "atm_temp": None, "soil_ph": None},
+            "abex": {
+                "soil_temp": None, "atm_temp": None, "soil_hum": None,
+                "atm_hum": None, "soil_ph": None, "atm_ph": None,
+                "soil_pres": None, "atm_pres": None
+            },
+            "object": None,
+            "panorama": None,
         }
 
         # Publishers used by the dashboard command buttons.
@@ -88,10 +95,21 @@ class RoverNode(Node):
         except (TypeError, ValueError):
             pass
         with state_lock:
+            voltage = float(msg.voltage)
+            current = float(msg.current)
+            if not (voltage == voltage and abs(voltage) != float("inf")):
+                voltage = None
+            if not (current == current and abs(current) != float("inf")):
+                current = None
             self.state["battery"] = {
-                "voltage": round(float(msg.voltage), 2),
+                "voltage": round(voltage, 2) if voltage is not None else None,
                 "percent": percent,
+                "current": round(current, 2) if current is not None else None,
             }
+            self.state["power"] = (
+                round(abs(voltage * current), 1)
+                if voltage is not None and current is not None else None
+            )
 
     def gps_cb(self, msg):
         with state_lock:
@@ -121,11 +139,11 @@ class RoverNode(Node):
             self.get_logger().warning("/abex/data needs at least 3 values")
             return
         with state_lock:
-            self.state["abex"] = {
+            self.state["abex"].update({
                 "soil_temp": float(msg.data[0]),
                 "atm_temp": float(msg.data[1]),
                 "soil_ph": float(msg.data[2]),
-            }
+            })
 
     def autonomy_cb(self, msg):
         value = msg.data.strip().upper()
