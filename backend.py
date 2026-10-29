@@ -229,7 +229,7 @@ def webcam1_generator():
                 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-                cap.set(cv2.CAP_PROP_FPS, 5)
+                cap.set(cv2.CAP_PROP_FPS, 1)
 
                 if not cap.isOpened():
                     log.warning("Could not open USB webcam: %s", WEBCAM1_SOURCE)
@@ -304,7 +304,7 @@ def webcam2_generator():
                     )
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 160)
                     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 120)
-                    cap.set(cv2.CAP_PROP_FPS, 5)
+                    cap.set(cv2.CAP_PROP_FPS, 1)
 
                                         # Match the standalone test: begin reading immediately.
                     log.info(
