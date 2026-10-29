@@ -39,6 +39,8 @@ log = logging.getLogger("rover-backend")
 
 REALSENSE_TOPIC = os.getenv("REALSENSE_TOPIC", "/camera/camera/color/image_raw")
 ZED_INDEX = int(os.getenv("ZED_INDEX", "0"))
+WEBCAM1_SOURCE = os.getenv("WEBCAM1_SOURCE", "/dev/video8")
+WEBCAM2_SOURCE = os.getenv("WEBCAM2_SOURCE", "/dev/video10")
 CAMERA_FPS = max(1, int(os.getenv("CAMERA_FPS", "15")))
 JPEG_QUALITY = max(30, min(95, int(os.getenv("JPEG_QUALITY", "80"))))
 
@@ -213,6 +215,162 @@ def zed_generator():
             cap.release()
 
 
+
+def webcam1_generator():
+    """Stream the USB webcam connected at WEBCAM1_SOURCE."""
+    cap = None
+    try:
+        while True:
+            if cap is None or not cap.isOpened():
+                if cap is not None:
+                    cap.release()
+
+                cap = cv2.VideoCapture(WEBCAM1_SOURCE, cv2.CAP_V4L2)
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+                cap.set(cv2.CAP_PROP_FPS, 5)
+
+                if not cap.isOpened():
+                    log.warning("Could not open USB webcam: %s", WEBCAM1_SOURCE)
+                    cap.release()
+                    cap = None
+                    time.sleep(1.0)
+                    continue
+
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                log.warning("Could not read USB webcam frame from %s", WEBCAM1_SOURCE)
+                cap.release()
+                cap = None
+                time.sleep(0.2)
+                continue
+
+            encoded_ok, encoded = cv2.imencode(
+                ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY]
+            )
+            if encoded_ok:
+                jpeg = encoded.tobytes()
+                yield (
+                    b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                    + str(len(jpeg)).encode()
+                    + b"\r\n\r\n" + jpeg + b"\r\n"
+                )
+            time.sleep(1.0 / CAMERA_FPS)
+    finally:
+        if cap is not None:
+            cap.release()
+
+
+
+
+def webcam2_generator():
+    """Stream the second USB webcam for the existing IPcam1 field."""
+    cap = None
+
+    try:
+        while True:
+            try:
+                if cap is None or not cap.isOpened():
+                    if cap is not None:
+                        cap.release()
+                        cap = None
+
+                    log.info(
+                        "Opening second USB webcam: %s",
+                        WEBCAM2_SOURCE,
+                    )
+
+                    # Use the same V4L2 and MJPEG settings as the
+                    # successful independent camera test.
+                    cap = cv2.VideoCapture(
+                        WEBCAM2_SOURCE,
+                        cv2.CAP_V4L2,
+                    )
+
+                    if not cap.isOpened():
+                        log.error(
+                            "Cannot open second USB webcam: %s",
+                            WEBCAM2_SOURCE,
+                        )
+                        cap.release()
+                        cap = None
+                        time.sleep(1.0)
+                        continue
+
+                    cap.set(
+                        cv2.CAP_PROP_FOURCC,
+                        cv2.VideoWriter_fourcc(*"MJPG"),
+                    )
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 160)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 120)
+                    cap.set(cv2.CAP_PROP_FPS, 5)
+
+                                        # Match the standalone test: begin reading immediately.
+                    log.info(
+                        "Camera settings: %.0fx%.0f at %.0f FPS",
+                        cap.get(cv2.CAP_PROP_FRAME_WIDTH),
+                        cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+                        cap.get(cv2.CAP_PROP_FPS),
+                    )
+
+                    log.info(
+                        "Second USB webcam opened: %s",
+                        WEBCAM2_SOURCE,
+                    )
+
+                ok, frame = cap.read()
+
+                if not ok or frame is None:
+                    log.warning(
+                        "Could not read second USB webcam frame from %s",
+                        WEBCAM2_SOURCE,
+                    )
+                    cap.release()
+                    cap = None
+                    time.sleep(1.0)
+                    continue
+
+                encoded_ok, encoded = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
+                )
+
+                if encoded_ok:
+                    jpeg = encoded.tobytes()
+
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n"
+                        b"Content-Length: "
+                        + str(len(jpeg)).encode()
+                        + b"\r\n\r\n"
+                        + jpeg
+                        + b"\r\n"
+                    )
+
+                time.sleep(1.0 / min(CAMERA_FPS, 10))
+
+            except Exception:
+                log.exception("Error while reading second USB webcam")
+
+                if cap is not None:
+                    cap.release()
+                    cap = None
+
+                time.sleep(1.0)
+
+    except GeneratorExit:
+        pass
+
+    finally:
+        if cap is not None:
+            cap.release()
+            log.info("Second USB webcam released")
+
+
+
 def realsense_generator():
     """Stream the latest image received from the RealSense ROS 2 topic."""
     while True:
@@ -233,7 +391,7 @@ def root():
     return {
         "name": "Prana Rover Dashboard Backend",
         "status": "ok",
-        "endpoints": ["/health", "/ws", "/camera/zed", "/camera/realsense", "/kill", "/relocalize", "/clear_costmap"],
+        "endpoints": ["/health", "/ws", "/camera/zed", "/camera/realsense", "/camera/webcam1", "/camera/ipcam1", "/kill", "/relocalize", "/clear_costmap"],
     }
 
 
@@ -294,6 +452,18 @@ async def websocket_endpoint(ws: WebSocket):
 @app.get("/camera/zed")
 def zed_cam():
     return mjpeg_response(zed_generator())
+
+
+
+@app.get("/camera/webcam1")
+def webcam1_cam():
+    return mjpeg_response(webcam1_generator())
+
+
+@app.get("/camera/ipcam1")
+def ipcam1_cam():
+    """Use the existing IPcam1 dashboard field for the second USB webcam."""
+    return mjpeg_response(webcam2_generator())
 
 
 @app.get("/camera/realsense")
